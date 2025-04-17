@@ -3,220 +3,259 @@ package io.github.Pacman.game;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.Screen;
+import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.Texture;
-import com.badlogic.gdx.graphics.g2d.Sprite;
-import com.badlogic.gdx.math.Rectangle;
-import java.util.ArrayList;
-import java.util.List;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.GlyphLayout;
+import com.badlogic.gdx.graphics.g2d.Sprite;
+import com.badlogic.gdx.math.Rectangle;
+
+import java.util.*;
 
 public class GameScreen implements Screen {
     private final PacmanGame game;
-    private final Texture playerTexture, wallTexture, pointTexture;
-    private final Sprite pacmanRight;
-    private final Sprite pacmanLeft;
-    private final Sprite pacmanUp;
-    private final Sprite pacmanDown;
+    private final Texture playerTexture, wallTexture, pointTexture, powerupTexture, ghostTexture, vulnerableGhostTexture;
+    private final Sprite pacmanRight, pacmanLeft, pacmanUp, pacmanDown;
     private Sprite currentPacman;
     private final BitmapFont font;
-    private final GlyphLayout layout; // Used for text alignment
+    private final GlyphLayout layout;
     private float x, y;
-    private float dx = 0, dy = 0; // Movement direction
+    private float dx = 0, dy = 0;
     private final List<Rectangle> walls;
-    private final List<Rectangle> points;
+    private final List<Pellet> pellets;
+    private final List<Ghost> ghosts = new ArrayList<>();
     private int score = 0;
-    private int[][] mazeLayout; // Store original maze layout for pellet respawn
+    private boolean gameOver = false;
+    private boolean playerCaught = false;
+    private boolean isPoweredUp = false;
+    private float powerupTimer = 0;
 
-    public GameScreen(PacmanGame game) {
+    private final int[][] layoutData = {
+        {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1},
+        {1,0,0,0,0,0,0,1,0,0,1,0,0,0,1,0,0,0,0,1},
+        {1,0,1,1,1,1,0,1,1,0,1,1,1,0,1,1,1,1,0,1},
+        {1,0,1,0,0,1,0,0,1,0,0,0,1,0,0,0,0,1,0,1},
+        {1,0,1,0,1,1,1,0,1,1,1,0,1,1,1,1,0,1,0,1},
+        {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
+        {1,1,1,1,0,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1},
+        {1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1},
+        {1,0,1,1,1,1,1,1,1,1,1,1,1,1,0,1,1,1,0,1},
+        {1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1},
+        {1,1,1,1,1,0,1,1,1,1,1,1,0,1,1,1,0,1,0,1},
+        {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1},
+        {1,1,0,1,1,1,0,1,1,1,1,1,1,1,1,1,1,1,0,1},
+        {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
+        {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1}
+    };
+
+    public GameScreen(PacmanGame game, int levelNumber) {
         this.game = game;
         playerTexture = new Texture("pacman1.png");
         wallTexture = new Texture("wall.png");
-        pointTexture = new Texture("point.png"); // Ensure this file exists
-        font = new BitmapFont(); // Default font
-        font.getData().setScale(2); // Make text larger
+        pointTexture = new Texture("point.png");
+        powerupTexture = new Texture("powerup.png");
+        ghostTexture = new Texture("ghost.png");
+        vulnerableGhostTexture = new Texture("vulnerable_ghost.png");
+
+        float[] pos1 = getRandomFreeTilePosition();
+        float[] pos2 = getRandomFreeTilePosition();
+        ghosts.add(new Ghost(ghostTexture, vulnerableGhostTexture, pos1[0], pos1[1]));
+        ghosts.add(new Ghost(ghostTexture, vulnerableGhostTexture, pos2[0], pos2[1]));
+
+        font = new BitmapFont();
+        font.setColor(Color.WHITE);
+        font.getData().setScale(2);
         layout = new GlyphLayout();
 
-        float pacmanSize = 25;
-
         pacmanRight = new Sprite(playerTexture);
-        pacmanRight.setSize(pacmanSize, pacmanSize);
-        pacmanRight.setOriginCenter();
+        pacmanLeft = new Sprite(playerTexture); pacmanLeft.flip(true, false);
+        pacmanUp = new Sprite(playerTexture); pacmanUp.setRotation(90);
+        pacmanDown = new Sprite(playerTexture); pacmanDown.setRotation(-90);
 
-        pacmanLeft = new Sprite(playerTexture);
-        pacmanLeft.setSize(pacmanSize, pacmanSize);
-        pacmanLeft.setOriginCenter();
-        pacmanLeft.flip(true, false);
-
-        pacmanUp = new Sprite(playerTexture);
-        pacmanUp.setSize(pacmanSize, pacmanSize);
-        pacmanUp.setOriginCenter();
-        pacmanUp.setRotation(90);
-
-        pacmanDown = new Sprite(playerTexture);
-        pacmanDown.setSize(pacmanSize, pacmanSize);
-        pacmanDown.setOriginCenter();
-        pacmanDown.setRotation(-90);
+        for (Sprite s : new Sprite[]{pacmanRight, pacmanLeft, pacmanUp, pacmanDown}) {
+            s.setSize(25, 25);
+            s.setOriginCenter();
+        }
 
         currentPacman = pacmanRight;
-
         walls = new ArrayList<>();
-        points = new ArrayList<>();
+        pellets = new ArrayList<>();
         createMaze();
     }
 
     private void createMaze() {
-        int cols = 20;
-        int rows = 15;
-        int wallSize = Gdx.graphics.getWidth() / cols;
-
-        int[][] mazeLayout = {
-            {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
-            {1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 1},
-            {1, 0, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1},
-            {1, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 1},
-            {1, 0, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 0, 1},
-            {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-            {1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1},
-            {1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1},
-            {1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1},
-            {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1},
-            {1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 0, 1},
-            {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1},
-            {1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1},
-            {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-            {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}
-        };
+        int wallSize = Gdx.graphics.getWidth() / 20;
+        Random rand = new Random();
+        List<Pellet> pelletCandidates = new ArrayList<>();
 
         walls.clear();
-        points.clear();
+        pellets.clear();
 
-        for (int row = 0; row < rows; row++) {
-            for (int col = 0; col < cols; col++) {
+        for (int row = 0; row < 15; row++) {
+            for (int col = 0; col < 20; col++) {
                 int xPos = col * wallSize;
                 int yPos = Gdx.graphics.getHeight() - (row + 1) * wallSize;
-
-                if (mazeLayout[row][col] == 1) {
+                if (layoutData[row][col] == 1) {
                     walls.add(new Rectangle(xPos, yPos, wallSize, wallSize));
                 } else {
-                    points.add(new Rectangle(xPos + (float) wallSize / 2, yPos + (float) wallSize / 2, 5, 5));
-
-                    // Set Pac-Man's spawn position at the first open space found
+                    Pellet pellet = new Pellet(xPos + wallSize / 2f, yPos + wallSize / 2f, 5, 5, Pellet.PelletType.NORMAL);
                     if (x == 0 && y == 0) {
-                        x = xPos + (float) wallSize / 2 - pacmanRight.getWidth() / 2;
-                        y = yPos + (float) wallSize / 2 - pacmanRight.getHeight() / 2;
+                        x = xPos + wallSize / 2f - pacmanRight.getWidth() / 2f;
+                        y = yPos + wallSize / 2f - pacmanRight.getHeight() / 2f;
                     }
+                    pelletCandidates.add(pellet);
                 }
+            }
+        }
+
+        Collections.shuffle(pelletCandidates);
+        for (int i = 0; i < Math.min(4, pelletCandidates.size()); i++) {
+            Pellet p = pelletCandidates.get(i);
+            pellets.add(new Pellet(p.getBounds().x, p.getBounds().y, 5, 5, Pellet.PelletType.POWERUP));
+        }
+
+        for (int i = 4; i < pelletCandidates.size(); i++) {
+            Pellet p = pelletCandidates.get(i);
+            pellets.add(p);
+        }
+    }
+
+    private float[] getRandomFreeTilePosition() {
+        int wallSize = Gdx.graphics.getWidth() / 20;
+        List<float[]> freeTiles = new ArrayList<>();
+
+        for (int row = 0; row < 15; row++) {
+            for (int col = 0; col < 20; col++) {
+                if (layoutData[row][col] == 0) {
+                    float x = col * wallSize + wallSize / 2f - 12.5f;
+                    float y = Gdx.graphics.getHeight() - (row + 1) * wallSize + wallSize / 2f - 12.5f;
+                    freeTiles.add(new float[]{x, y});
+                }
+            }
+        }
+
+        Collections.shuffle(freeTiles);
+        return freeTiles.isEmpty() ? new float[]{100, 100} : freeTiles.get(0);
+    }
+
+    private void handleInput() {
+        float speed = 150;
+        if (Gdx.input.isKeyJustPressed(Input.Keys.LEFT)) {
+            dx = -speed; dy = 0; currentPacman = pacmanLeft;
+        } else if (Gdx.input.isKeyJustPressed(Input.Keys.RIGHT)) {
+            dx = speed; dy = 0; currentPacman = pacmanRight;
+        } else if (Gdx.input.isKeyJustPressed(Input.Keys.UP)) {
+            dy = speed; dx = 0; currentPacman = pacmanUp;
+        } else if (Gdx.input.isKeyJustPressed(Input.Keys.DOWN)) {
+            dy = -speed; dx = 0; currentPacman = pacmanDown;
+        }
+    }
+
+    private boolean isColliding(float newX, float newY) {
+        Rectangle pacmanBounds = new Rectangle(newX, newY, currentPacman.getWidth(), currentPacman.getHeight());
+        for (Rectangle wall : walls)
+            if (pacmanBounds.overlaps(wall)) return true;
+        return false;
+    }
+
+    private void checkPelletCollision() {
+        Rectangle pacmanBounds = new Rectangle(x, y, currentPacman.getWidth(), currentPacman.getHeight());
+
+        Iterator<Pellet> iterator = pellets.iterator();
+        while (iterator.hasNext()) {
+            Pellet pellet = iterator.next();
+            if (pacmanBounds.overlaps(pellet.getBounds())) {
+                if (pellet.getType() == Pellet.PelletType.NORMAL) {
+                    score += 10;
+                } else {
+                    score += 50;
+                    isPoweredUp = true;
+                    powerupTimer = 7f;
+                }
+                iterator.remove();
             }
         }
     }
 
-
     @Override
     public void render(float delta) {
+
+
+        if (playerCaught) {
+            game.setScreen(new GameOverScreen(game));
+            return;
+        }
+
         handleInput();
         float newX = x + dx * delta;
         float newY = y + dy * delta;
-
         if (!isColliding(newX, newY)) {
             x = newX;
             y = newY;
         }
 
-        checkPointCollision();
+        checkPelletCollision();
 
+        if (pellets.isEmpty()) {
+            game.setScreen(new YouWinScreen(game));
+            return;
+        }
+
+        if (isPoweredUp) {
+            powerupTimer -= delta;
+            if (powerupTimer <= 0) {
+                isPoweredUp = false;
+            }
+        }
+
+        Gdx.gl.glClearColor(0, 0, 0.2f, 1);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
         game.batch.begin();
 
-        // Draw Walls
-        for (Rectangle wall : walls) {
+        for (Rectangle wall : walls)
             game.batch.draw(wallTexture, wall.x, wall.y, wall.width, wall.height);
-        }
 
-        // Draw Points
-        for (Rectangle point : points) {
-            game.batch.draw(pointTexture, point.x, point.y, 5, 5);
-        }
+        for (Pellet pellet : pellets)
+            pellet.draw(game.batch, pointTexture, powerupTexture);
 
-        // Draw Pacman
         currentPacman.setPosition(x, y);
         currentPacman.draw(game.batch);
+        font.draw(game.batch, "Score: " + score, 20, Gdx.graphics.getHeight() - 20);
 
-        // Display Score
-        String scoreText = "Score: " + score;
-        layout.setText(font, scoreText);
-        font.draw(game.batch, scoreText, 20, Gdx.graphics.getHeight() - 20); // Position: Top-left
+        Rectangle pacmanBounds = new Rectangle(x, y, currentPacman.getWidth(), currentPacman.getHeight());
+
+        for (Ghost ghost : ghosts) {
+            ghost.setVulnerable(isPoweredUp);
+            ghost.update(delta, x, y, walls);
+            ghost.draw(game.batch);
+
+            if (ghost.getBounds().overlaps(pacmanBounds)) {
+                if (isPoweredUp) {
+                    ghost.resetPosition();
+                    score += 200;
+                } else {
+                    playerCaught = true;
+                }
+            }
+        }
 
         game.batch.end();
     }
 
-
-    private void handleInput() {
-        // Speed in pixels per second
-        float moveSpeed = 150;
-        if (Gdx.input.isKeyJustPressed(Input.Keys.LEFT)) {
-            dx = -moveSpeed;
-            dy = 0;
-            currentPacman = pacmanLeft;
-        }
-        if (Gdx.input.isKeyJustPressed(Input.Keys.RIGHT)) {
-            dx = moveSpeed;
-            dy = 0;
-            currentPacman = pacmanRight;
-        }
-        if (Gdx.input.isKeyJustPressed(Input.Keys.UP)) {
-            dy = moveSpeed;
-            dx = 0;
-            currentPacman = pacmanUp;
-        }
-        if (Gdx.input.isKeyJustPressed(Input.Keys.DOWN)) {
-            dy = -moveSpeed;
-            dx = 0;
-            currentPacman = pacmanDown;
-        }
-    }
-
-    private void checkPointCollision() {
-        Rectangle pacmanBounds = new Rectangle(x, y, currentPacman.getWidth(), currentPacman.getHeight());
-
-        points.removeIf(point -> {
-            if (pacmanBounds.overlaps(point)) {
-                score += 10; // Increase score by 10 per pellet
-                return true; // Remove point
-            }
-            return false;
-        });
-    }
-
-    private boolean isColliding(float newX, float newY) {
-        Rectangle pacmanBounds = new Rectangle(newX, newY, currentPacman.getWidth(), currentPacman.getHeight());
-
-        for (Rectangle wall : walls) {
-            if (pacmanBounds.overlaps(wall)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    @Override
-    public void dispose() {
+    @Override public void dispose() {
         playerTexture.dispose();
         wallTexture.dispose();
+        pointTexture.dispose();
+        powerupTexture.dispose();
         font.dispose();
-        wallTexture.dispose();
+        ghostTexture.dispose();
+        vulnerableGhostTexture.dispose();
     }
 
-    @Override
-    public void show() {}
-    @Override
-    public void resize(int width, int height) {}
-    @Override
-    public void pause() {}
-    @Override
-    public void resume() {}
-    @Override
-    public void hide() {}
-
+    @Override public void show() {}
+    @Override public void resize(int width, int height) {}
+    @Override public void pause() {}
+    @Override public void resume() {}
+    @Override public void hide() {}
 }
