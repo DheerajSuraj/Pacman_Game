@@ -11,7 +11,7 @@ import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
 import com.badlogic.gdx.scenes.scene2d.InputEvent;
 
 public class MainMenu implements Screen {
-    private PacmanGame game;
+    private final PacmanGame game;
     private Stage stage;
     private Skin skin;
     private Texture background;
@@ -26,10 +26,12 @@ public class MainMenu implements Screen {
         Gdx.input.setInputProcessor(stage);
         skin = new Skin(Gdx.files.internal("uiskin.json"));
 
-        // Background
-        background = new Texture("bg.jpg");
+        try {
+            background = new Texture("bg.jpg");
+        } catch (Exception e) {
+            background = null;
+        }
 
-        // Create Button
         TextButton button = new TextButton("Start Game", skin);
         button.setSize(200, 50);
         button.setPosition(Gdx.graphics.getWidth() / 2f - 100, 100);
@@ -38,7 +40,7 @@ public class MainMenu implements Screen {
         button.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
-                game.setScreen(new LevelSelectScreen(game));
+                game.setScreen(new LevelSelectScreen(game)); // Only loads when clicked
             }
         });
 
@@ -47,28 +49,28 @@ public class MainMenu implements Screen {
 
     @Override
     public void render(float delta) {
+        Gdx.gl.glClearColor(0, 0, 0, 1); // Black background
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
         game.batch.begin();
-        game.batch.draw(background, 0, 0, Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
+        if (background != null) {
+            game.batch.draw(background, 0, 0, Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
+        }
         game.batch.end();
 
         stage.act(delta);
         stage.draw();
     }
 
-    @Override
-    public void resize(int width, int height) {}
-    @Override
-    public void pause() {}
-    @Override
-    public void resume() {}
-    @Override
-    public void hide() {}
+    @Override public void resize(int width, int height) {}
+    @Override public void pause() {}
+    @Override public void resume() {}
+    @Override public void hide() {}
+
     @Override
     public void dispose() {
         stage.dispose();
         skin.dispose();
-        background.dispose();
+        if (background != null) background.dispose();
     }
 }

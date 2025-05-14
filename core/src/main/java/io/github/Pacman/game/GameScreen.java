@@ -31,26 +31,12 @@ public class GameScreen implements Screen {
     private boolean isPoweredUp = false;
     private float powerupTimer = 0;
 
-    private final int[][] layoutData = {
-        {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1},
-        {1,0,0,0,0,0,0,1,0,0,1,0,0,0,1,0,0,0,0,1},
-        {1,0,1,1,1,1,0,1,1,0,1,1,1,0,1,1,1,1,0,1},
-        {1,0,1,0,0,1,0,0,1,0,0,0,1,0,0,0,0,1,0,1},
-        {1,0,1,0,1,1,1,0,1,1,1,0,1,1,1,1,0,1,0,1},
-        {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
-        {1,1,1,1,0,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1},
-        {1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1},
-        {1,0,1,1,1,1,1,1,1,1,1,1,1,1,0,1,1,1,0,1},
-        {1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1},
-        {1,1,1,1,1,0,1,1,1,1,1,1,0,1,1,1,0,1,0,1},
-        {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1},
-        {1,1,0,1,1,1,0,1,1,1,1,1,1,1,1,1,1,1,0,1},
-        {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
-        {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1}
-    };
+    private final int[][] layoutData;
 
     public GameScreen(PacmanGame game, int levelNumber) {
         this.game = game;
+        this.layoutData = LevelData.getLayout(levelNumber);
+
         playerTexture = new Texture("pacman1.png");
         wallTexture = new Texture("wall.png");
         pointTexture = new Texture("point.png");
@@ -62,6 +48,8 @@ public class GameScreen implements Screen {
         float[] pos2 = getRandomFreeTilePosition();
         ghosts.add(new Ghost(ghostTexture, vulnerableGhostTexture, pos1[0], pos1[1]));
         ghosts.add(new Ghost(ghostTexture, vulnerableGhostTexture, pos2[0], pos2[1]));
+        //ghosts.add(new Ghost(ghostTexture, vulnerableGhostTexture, pos2[0], pos2[1]));
+
 
         font = new BitmapFont();
         font.setColor(Color.WHITE);
@@ -92,8 +80,8 @@ public class GameScreen implements Screen {
         walls.clear();
         pellets.clear();
 
-        for (int row = 0; row < 15; row++) {
-            for (int col = 0; col < 20; col++) {
+        for (int row = 0; row < layoutData.length; row++) {
+            for (int col = 0; col < layoutData[row].length; col++) {
                 int xPos = col * wallSize;
                 int yPos = Gdx.graphics.getHeight() - (row + 1) * wallSize;
                 if (layoutData[row][col] == 1) {
@@ -112,7 +100,7 @@ public class GameScreen implements Screen {
         Collections.shuffle(pelletCandidates);
         for (int i = 0; i < Math.min(4, pelletCandidates.size()); i++) {
             Pellet p = pelletCandidates.get(i);
-            pellets.add(new Pellet(p.getBounds().x, p.getBounds().y, 5, 5, Pellet.PelletType.POWERUP));
+                pellets.add(new Pellet(p.getBounds().x, p.getBounds().y, 5, 5, Pellet.PelletType.POWERUP));
         }
 
         for (int i = 4; i < pelletCandidates.size(); i++) {
@@ -125,8 +113,8 @@ public class GameScreen implements Screen {
         int wallSize = Gdx.graphics.getWidth() / 20;
         List<float[]> freeTiles = new ArrayList<>();
 
-        for (int row = 0; row < 15; row++) {
-            for (int col = 0; col < 20; col++) {
+        for (int row = 0; row < layoutData.length; row++) {
+            for (int col = 0; col < layoutData[row].length; col++) {
                 if (layoutData[row][col] == 0) {
                     float x = col * wallSize + wallSize / 2f - 12.5f;
                     float y = Gdx.graphics.getHeight() - (row + 1) * wallSize + wallSize / 2f - 12.5f;
@@ -180,10 +168,8 @@ public class GameScreen implements Screen {
 
     @Override
     public void render(float delta) {
-
-
         if (playerCaught) {
-            game.setScreen(new GameOverScreen(game));
+            game.setScreen(new GameOverScreen(game, score));
             return;
         }
 

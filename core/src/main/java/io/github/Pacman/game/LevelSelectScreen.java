@@ -26,29 +26,33 @@ public class LevelSelectScreen implements Screen {
         stage = new Stage();
         Gdx.input.setInputProcessor(stage);
         skin = new Skin(Gdx.files.internal("uiskin.json"));
-        background = new Texture("bg.jpg"); // Optional: same background
+        background = new Texture("Level.jpg");
 
         Table table = new Table();
         table.setFillParent(true);
+        table.center(); // Center content
         stage.addActor(table);
 
-        for (int i = 1; i <= 10; i++) {
+        for (int i = 1; i <= 3; i++) {
             final int level = i;
             TextButton button = new TextButton("Level " + i, skin);
+            button.getLabel().setFontScale(1.5f); // Slightly larger text
             button.addListener(new ClickListener() {
                 @Override
                 public void clicked(InputEvent event, float x, float y) {
-                    game.setScreen(new GameScreen(game, level)); // Pass level number
+                    game.setScreen(new GameScreen(game, level));
                 }
             });
-            table.add(button).pad(10).width(200).height(50);
-            if (i % 2 == 0) table.row(); // 2 buttons per row
+            table.add(button).pad(15).width(250).height(60);
+            table.row(); // One button per row
         }
     }
 
     @Override
     public void render(float delta) {
+        Gdx.gl.glClearColor(0, 0, 0, 1); // Clear with black background
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
+
         game.batch.begin();
         game.batch.draw(background, 0, 0, Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
         game.batch.end();
